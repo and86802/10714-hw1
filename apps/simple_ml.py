@@ -33,7 +33,24 @@ def parse_mnist(image_filesname, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    with gzip.open(image_filesname, 'rb') as f:
+        f.read(4)
+        # '>' denotes to big-endian, and 'I' denotes to unsigned int
+        num_samples = struct.unpack('>I', f.read(4))[0]
+        input_dim1 = struct.unpack('>I', f.read(4))[0]
+        input_dim2 = struct.unpack('>I', f.read(4))[0]
+        buf = f.read(num_samples * input_dim1 * input_dim2)
+        X = np.frombuffer(buf, dtype=np.uint8).astype(np.float32)
+        X /= 255.0
+        X = X.reshape(num_samples, input_dim1 * input_dim2)
+    
+    with gzip.open(label_filename, 'rb') as f:
+        f.read(4)
+        num_samples = struct.unpack('>I', f.read(4))[0]
+        buf = f.read(num_samples)
+        y = np.frombuffer(buf, dtype=np.uint8)
+    
+    return (X, y)
     ### END YOUR SOLUTION
 
 
@@ -54,7 +71,10 @@ def softmax_loss(Z, y_one_hot):
         Average softmax loss over the sample. (ndl.Tensor[np.float32])
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    log_sum_exp_z = ndl.log(ndl.summation(ndl.exp(Z), (1,)))
+    hy = ndl.summation(ndl.multiply(Z, y_one_hot), (1,))
+    loss = ndl.summation(log_sum_exp_z - hy, (0,)) / Z.shape[0]
+    return loss
     ### END YOUR SOLUTION
 
 
@@ -83,7 +103,20 @@ def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
     """
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    m = X.shape[0]
+    for i in range(0, m, batch):
+        X_batch = X[i:i+batch]
+        y_batch = y[i:i+batch]
+        Z1 = ndl.relu(ndl.matmul(ndl.Tensor(X_batch), W1))
+        logits = ndl.matmul(Z1, W2)
+        Iy= np.zeros_like(logits.numpy())
+        Iy[np.arange(batch), y_batch] = 1
+        Iy = ndl.Tensor(Iy)
+        loss = softmax_loss(logits, Iy)
+        loss.backward()
+        W1 = ndl.Tensor(W1.realize_cached_data() - lr * W1.grad.realize_cached_data())
+        W2 = ndl.Tensor(W2.realize_cached_data() - lr * W2.grad.realize_cached_data())
+    return W1, W2
     ### END YOUR SOLUTION
 
 
